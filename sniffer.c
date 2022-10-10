@@ -12,6 +12,34 @@
 #define SIZE_ETHERNET 14
 #define SNAP_LEN 1518
 typedef u_int tcp_seq;
+void
+print_payload(const u_char *payload, int len);
+
+
+
+void print_app_usage(void)
+	
+{
+
+//	printf("Usage: %s [interface]\n", APP_NAME);
+	printf("\n");
+	printf("Options:\n");
+	printf("    interface    Listen on <interface> for packets.\n");
+	printf("\n");
+
+return;
+}
+void print_app_banner(void)
+{
+/*
+	printf("%s - %s\n", APP_NAME, APP_DESC);
+	printf("%s\n", APP_COPYRIGHT);
+	printf("%s\n", APP_DISCLAIMER);
+	*/
+	printf("\n");
+
+return;
+}
 struct sniff_ethernet {
         u_char  ether_dhost[ETHER_ADDR_LEN];    /* destination host address */
         u_char  ether_shost[ETHER_ADDR_LEN];    /* source host address */
@@ -72,63 +100,81 @@ void processPacket(u_char *arg,const struct pcap_pkthdr* pkthdr,const u_char *pa
 		return;
 	}
 	printf("Length of the packet%d\n",pkthdr -> caplen);
-	printf("Timestamp : %s",pkthdr -> ts);
+	printf("Timestamp : %s",ctime((const time_t *)pkthdr -> ts.tv_sec));
 	printf("       SourceIP: %s\n", inet_ntoa(ip->ip_src));
 	printf("       DestIP: %s\n", inet_ntoa(ip->ip_dst));
 }
-int main(int argc, char *argv)
+int main(int argc, char *argv[])
 {
 	int count = 0;
 
 	pcap_t *handle;			/* Session handle */
 	int numberdevices;
-	pcap_if_t **dev;			/* The device to sniff on */
+	char* dev;		/* The device to sniff on */
 	char errbuf[PCAP_ERRBUF_SIZE];	/* Error string */
 	struct bpf_program fp;		/* The compiled filter */
-	char filter_exp[] = "port 80";
-	char filter_exp2[] = "port 443";
+	char filter_exp[] = "dst port 80 or dst port 443";
+
 	struct bpf_program fp2;
 	bpf_u_int32 mask;		/* Our netmask */
 	bpf_u_int32 net;		/* Our IP */
 	struct pcap_pkthdr header;	/* The header that pcap gives us */
 	const u_char *packet;
 	/* Define the device */
-	numberdevices = pcap_findalldevs(dev,errbuf);
+	/* check for capture device name on command-line */
+	
+	if (argc == 2) {
+		dev = argv[1];
+	}
+	else if (argc > 2) {
+		fprintf(stderr, "error: unrecognized command-line options\n\n");
+		print_app_usage();
+		exit(EXIT_FAILURE);
+	}
+	
+	else {
+		  
+		dev = pcap_lookupdev(errbuf);
+		if (dev == NULL) {
+			fprintf(stderr, "Couldn't find default device: %s\n",
+			    errbuf);
+			exit(EXIT_FAILURE);
+		}
+	}
+	/*
+	numberdevices = pcap_findalldevs(&dev,errbuf);
 	if (dev == NULL) {
 		fprintf(stderr, "Couldn't find default device: %s\n", errbuf);
 		return(2);
-	}
+	}*/
 
 	/* Find the properties for the device */
-	if (pcap_lookupnet((char*)*dev, &net, &mask, errbuf) == -1) {
-		fprintf(stderr, "Couldn't get netmask for device %s: %s\n", (char*)*dev, errbuf);
+	if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
+		fprintf(stderr, "Couldn't get netmask for device %s: %s\n",dev, errbuf);
 		net = 0;
 		mask = 0;
 	}
 
 	/* Open the session in promiscuous mode */
-	handle = pcap_open_live((char*)*dev, BUFSIZ, 1, 1000, errbuf);
+	handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
 	if (handle == NULL) {
-		fprintf(stderr, "Couldn't open device %s: %s\n",(char*)*dev, errbuf);
+		fprintf(stderr, "Couldn't open device %s: %s\n",dev, errbuf);
 		return(2);
 	}
 	if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
 	fprintf(stderr, "Couldn't parse filter %s: %s\n", filter_exp, pcap_geterr(handle));
 	return(2);
 }
-	if (pcap_compile(handle, &fp2, filter_exp2, 0, net) == -1) {
-	fprintf(stderr, "Couldn't parse filter %s: %s\n", filter_exp, pcap_geterr(handle));
-	return(2);
-}
+
 
 	if (pcap_setfilter(handle, &fp) == -1) {
 	fprintf(stderr, "Couldn't install filter %s: %s\n", filter_exp, pcap_geterr(handle));
 	return(2);
 }
-	if (pcap_setfilter(handle, &fp2) == -1) {
-		fprintf(stderr, "Couldn't install filter %s: %s\n", filter_exp, pcap_geterr(handle));
-		return(2);
+
 	pcap_loop(handle, -1,processPacket,(u_char*)&count);
 	return 0;
-}
+	pcap_freecode(&fp);
+    	pcap_close(handle);
+    	return 0;
 }
