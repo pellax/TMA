@@ -100,7 +100,7 @@ void processPacket(u_char *arg,const struct pcap_pkthdr* pkthdr,const u_char *pa
 		return;
 	}
 	printf("Length of the packet%d\n",pkthdr -> caplen);
-	printf("Timestamp : %s",ctime((const time_t *)pkthdr -> ts.tv_sec));
+	printf("Timestamp : %s",ctime((const time_t *)&pkthdr -> ts.tv_sec));
 	printf("       SourceIP: %s\n", inet_ntoa(ip->ip_src));
 	printf("       DestIP: %s\n", inet_ntoa(ip->ip_dst));
 }
